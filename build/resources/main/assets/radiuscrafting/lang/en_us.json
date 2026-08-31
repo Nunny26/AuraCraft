@@ -1,0 +1,14 @@
+{
+  "text.autoconfig.radiuscrafting.title": "Radius Crafting Settings",
+  "text.autoconfig.radiuscrafting.option.searchRadius": "Chest Search Radius",
+  "text.autoconfig.radiuscrafting.option.searchRadius.@Tooltip": "How many blocks away to search for nearby chests and barrels.",
+  "text.autoconfig.radiuscrafting.option.radius": "Crafting Radius (Blocks)",
+  "text.autoconfig.radiuscrafting.option.useEnderChest": "Use Ender Chest",
+  "text.autoconfig.radiuscrafting.option.useEnderChest.@Tooltip": "If enabled, items will be pulled from your Ender Chest.",
+  "text.autoconfig.radiuscrafting.option.useShulkerBoxes": "Use Shulker Boxes",
+  "text.autoconfig.radiuscrafting.option.useShulkerBoxes.@Tooltip": "If enabled, items will be pulled from Shulker Boxes in your inventory and Ender Chest.",
+  "text.autoconfig.radiuscrafting.option.pullPriority": "Pull Priority",
+  "text.autoconfig.radiuscrafting.option.pullPriority.INVENTORY_FIRST": "Inventory First",
+  "text.autoconfig.radiuscrafting.option.pullPriority.STORAGE_FIRST": "Storage First",
+  "text.autoconfig.radiuscrafting.option.ignoreLootChests": "Ignore Unopened Loot Chests"
+}

@@ -1,0 +1,31 @@
+{
+  "stats": {
+    "minecraft:dropped": {
+      "minecraft:yellow_shulker_box": 1
+    },
+    "minecraft:used": {
+      "minecraft:yellow_shulker_box": 2
+    },
+    "minecraft:mined": {
+      "minecraft:yellow_shulker_box": 1
+    },
+    "minecraft:custom": {
+      "minecraft:sprint_one_cm": 683,
+      "minecraft:time_since_rest": 814,
+      "minecraft:walk_one_cm": 1246,
+      "minecraft:total_world_time": 1513,
+      "minecraft:leave_game": 1,
+      "minecraft:fly_one_cm": 1449,
+      "minecraft:damage_taken": 20,
+      "minecraft:play_time": 814,
+      "minecraft:open_shulker_box": 1,
+      "minecraft:jump": 10,
+      "minecraft:time_since_death": 814,
+      "minecraft:drop": 1
+    },
+    "minecraft:picked_up": {
+      "minecraft:yellow_shulker_box": 2
+    }
+  },
+  "DataVersion": 4903
+}

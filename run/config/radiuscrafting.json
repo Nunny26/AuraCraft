@@ -1,0 +1,7 @@
+{
+  "searchRadius": 100,
+  "useEnderChest": true,
+  "useShulkerBoxes": true,
+  "ignoreUnopenedLootChests": true,
+  "pullPriority": "INVENTORY_FIRST"
+}
