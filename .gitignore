@@ -1,0 +1,15 @@
+# Gradle
+.gradle/
+build/
+
+# IDE files
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+
+# Fabric / Minecraft
+run/
+out/
+bin/
