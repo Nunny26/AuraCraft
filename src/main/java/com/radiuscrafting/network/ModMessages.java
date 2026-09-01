@@ -14,7 +14,6 @@ import java.util.List;
 
 public class ModMessages {
 
-    // 🛠️ FIXED: Uses Identifier for 26.2
     public static final CustomPacketPayload.Type<SyncNearbyItemsPayload> SYNC_NEARBY = new CustomPacketPayload.Type<>(Identifier.fromNamespaceAndPath("radiuscrafting", "sync_nearby"));
 
     public record SyncNearbyItemsPayload(List<ItemStack> items) implements CustomPacketPayload {
@@ -31,7 +30,6 @@ public class ModMessages {
     }
 
     public static void registerPayloads() {
-        // 🛠️ FIXED: Uses clientboundPlay() for Fabric 26.2
         PayloadTypeRegistry.clientboundPlay().register(SYNC_NEARBY, SyncNearbyItemsPayload.CODEC);
     }
 

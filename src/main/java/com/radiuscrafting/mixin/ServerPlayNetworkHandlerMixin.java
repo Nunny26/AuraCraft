@@ -20,17 +20,10 @@ import java.util.Optional;
 public class ServerPlayNetworkHandlerMixin {
 
     @Shadow public ServerPlayer player;
-
-    /**
-     * Intercepts the Recipe Book crafting request sent from the client BEFORE the vanilla logic executes.
-     * This is crucial because if we pull the items into the player's inventory right here,
-     * the subsequent vanilla ServerRecipeBookHelper logic will naturally find them and move them into the crafting grid.
-     */
     @Inject(method = "handlePlaceRecipe", at = @At("HEAD"))
     private void radiusCrafting$onCraftRequest(ServerboundPlaceRecipePacket packet, CallbackInfo ci) {
-        // 1. THREAD SAFETY LOCK
         if (!((net.minecraft.server.level.ServerLevel)this.player.level()).getServer().isSameThread()) {
-            return; // Abort on Netty thread. Vanilla will re-call this on the main Server Thread!
+            return;
         }
         
         if (packet.containerId() == this.player.containerMenu.containerId) {

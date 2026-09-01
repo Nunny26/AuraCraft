@@ -17,7 +17,6 @@ public class PlayerInventoryMixin {
 
     @Inject(method = "fillStackedContents", at = @At("TAIL"))
     private void radiusCrafting$populateRecipeFinder(net.minecraft.world.entity.player.StackedItemContents finder, CallbackInfo ci) {
-        // 🛠️ THE HALLUCINATION FIX: Only inject ghost items on the Client!
         if (this.player.level().isClientSide()) {
             for (ItemStack stack : RadiusCraftingClient.cachedNearbyItems) {
                 finder.accountStack(stack);

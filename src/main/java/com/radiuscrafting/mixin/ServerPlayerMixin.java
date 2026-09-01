@@ -25,9 +25,6 @@ public abstract class ServerPlayerMixin {
             radiusCrafting$tickCounter = 0;
             ServerPlayer player = (ServerPlayer) (Object) this;
             if (player.containerMenu != null && player.containerMenu != player.inventoryMenu) {
-                // If they have a container open (like Crafting Screen or standard Inventory Screen with Recipe Book)
-                // Actually we just sync unconditionally or when they are alive?
-                // The prompt says: "Every 20 ticks (1 second), generate the list of items using RadiusCraftingLogic.getSources(...), extract all the item stacks, and call ModMessages.sendSyncNearbyItems(player, allItems);"
                 List<ItemStack> allItems = RadiusCraftingLogic.getAllAvailableItems(
                     player,
                     com.radiuscrafting.RadiusCrafting.CONFIG.searchRadius,
@@ -36,7 +33,6 @@ public abstract class ServerPlayerMixin {
                 );
                 ModMessages.sendSyncNearbyItems(player, allItems);
             } else if (player.containerMenu == player.inventoryMenu) {
-                // Still sync for normal inventory because nearby storage widget appears there too!
                 List<ItemStack> allItems = RadiusCraftingLogic.getAllAvailableItems(
                     player,
                     com.radiuscrafting.RadiusCrafting.CONFIG.searchRadius,

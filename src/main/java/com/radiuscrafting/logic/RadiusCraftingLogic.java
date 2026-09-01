@@ -209,7 +209,7 @@ public class RadiusCraftingLogic {
         public ItemStack extractOne(Ingredient ingredient, Item lockedItem) {
             net.minecraft.world.item.component.ItemContainerContents contents = shulkerStack.getOrDefault(net.minecraft.core.component.DataComponents.CONTAINER, net.minecraft.world.item.component.ItemContainerContents.EMPTY);
             java.util.List<net.minecraft.world.item.ItemStack> list = new java.util.ArrayList<>();
-            contents.nonEmptyItemCopyStream().forEach(list::add); // Mutable copy of items
+            contents.nonEmptyItemCopyStream().forEach(list::add);
 
             net.minecraft.world.item.ItemStack extracted = net.minecraft.world.item.ItemStack.EMPTY;
 
@@ -217,7 +217,7 @@ public class RadiusCraftingLogic {
                 net.minecraft.world.item.ItemStack stack = list.get(i);
                 boolean isValid = lockedItem != null ? stack.is(lockedItem) : ingredient.test(stack);
                 if (!stack.isEmpty() && isValid) {
-                    extracted = stack.split(1); // split(1) modifies the original stack and returns exactly 1 item!
+                    extracted = stack.split(1);
                     if (stack.isEmpty()) {
                         list.set(i, net.minecraft.world.item.ItemStack.EMPTY);
                     }
@@ -228,7 +228,7 @@ public class RadiusCraftingLogic {
             if (!extracted.isEmpty()) {
                 shulkerStack.set(net.minecraft.core.component.DataComponents.CONTAINER, net.minecraft.world.item.component.ItemContainerContents.fromItems(list));
             }
-            return extracted; // Return the pulled item, NOT the remainder!
+            return extracted;
         }
 
         @Override
@@ -257,7 +257,6 @@ public class RadiusCraftingLogic {
             if (container != null) {
                 container.nonEmptyItemCopyStream().forEach(stack -> items.add(stack));
             }
-            // Ensure 27 slots for Shulker Box
             while(items.size() < 27) items.add(ItemStack.EMPTY);
             return items;
         }
@@ -389,7 +388,6 @@ public class RadiusCraftingLogic {
         List<Ingredient> baseIngredients = placementInfo.ingredients();
         it.unimi.dsi.fastutil.ints.IntList slotsToIngredientIndex = placementInfo.slotsToIngredientIndex();
         
-        // Build exactly 1 set of recipe ingredients
         List<Ingredient> ingredients = new java.util.ArrayList<>();
         for (int i = 0; i < slotsToIngredientIndex.size(); i++) {
             int idx = slotsToIngredientIndex.getInt(i);
@@ -397,8 +395,6 @@ public class RadiusCraftingLogic {
                 ingredients.add(baseIngredients.get(idx));
             }
         }
-        
-        // PHASE 1: The Virtual Ledger (Initialized once, mutated each iteration)
         java.util.Map<net.minecraft.world.item.Item, Integer> playerLedger = new java.util.HashMap<>();
         for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
             net.minecraft.world.item.ItemStack stack = player.getInventory().getItem(i);
@@ -417,7 +413,6 @@ public class RadiusCraftingLogic {
 
             for (int i = 0; i < ingredients.size(); i++) {
                 net.minecraft.world.item.crafting.Ingredient ingredient = ingredients.get(i);
-                // STRICT AIR/EMPTY CHECK
                 if (ingredient == null || ingredient.isEmpty() || ingredient.test(net.minecraft.world.item.ItemStack.EMPTY)) {
                     continue;
                 }
@@ -451,8 +446,6 @@ public class RadiusCraftingLogic {
                 if (!craftAll) break;
                 continue;
             }
-
-            // PHASE 2: Transactional Physical Extraction
             boolean success = true;
             class PendingExtraction {
                 final IItemSource source;
@@ -482,27 +475,22 @@ public class RadiusCraftingLogic {
             }
             
             if (success) {
-                // Commit to player inventory
                 for (PendingExtraction pe : pendingPulls) {
                     player.getInventory().add(pe.stack);
-                    // Add it to the ledger so the next iteration knows it is in the inventory
                     playerLedger.put(pe.stack.getItem(), playerLedger.getOrDefault(pe.stack.getItem(), 0) + 1);
                 }
                 craftIterations++;
                 if (!craftAll) break;
             } else {
-                // Abort and return to source to prevent partial flooding
                 for (PendingExtraction pe : pendingPulls) {
                     pe.source.insertItem(pe.stack);
                     if (!pe.stack.isEmpty()) {
-                        player.drop(pe.stack, false); // safety fallback
+                        player.drop(pe.stack, false);
                     }
                 }
                 break;
             }
         }
-
-        // PHASE 3: Sync to Client
         player.containerMenu.broadcastChanges();
         player.inventoryMenu.broadcastChanges();
     }
