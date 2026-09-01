@@ -1,8 +1,7 @@
 # AuraCraft
-Passively pulls ingredients from nearby Chests and Barrels to fulfill your crafting recipes.
-Pulls items directly from your Ender Chest, Shulker Boxes in your inventory, and even Shulker Boxes *inside* your Ender Chest!
-Passively synchronizes nearby items to your client. Recipes in the Vanilla Recipe Book will automatically light up and lose their "Red Squares" if the items are available in your radius.
-Fully supports Shift-Click "Craft All" mechanics. It mathematically calculates exact sets of missing ingredients and pulls them transactionally. 
+- Passively pulls ingredients from nearby Chests and Barrels to fulfill your crafting recipes.
+- Pulls items directly from your Ender Chest, Shulker Boxes in your inventory, and even Shulker Boxes *inside* your Ender Chest!
+- Fully supports Shift-Click mechanics.
 ## Configuration (Mod Menu)
 AuraCraft is fully configurable in-game using **Mod Menu** and **Cloth Config**. 
 Set how far the mod searches for chests (Configurable up to 100 blocks, Default: 8).
