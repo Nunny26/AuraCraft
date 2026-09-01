@@ -2,31 +2,20 @@ plugins {
     id 'net.fabricmc.fabric-loom' version '1.18.0-alpha.19'
     id 'maven-publish'
 }
-
 version = project.mod_version
 group = project.maven_group
 
 base {
     archivesName = project.archives_base_name
 }
-
 repositories {
-    maven { url = "https://maven.terraformersmc.com/" } // ModMenu
-    maven { url = "https://maven.shedaniel.me/" } // Cloth Config
+    maven { url = "https://maven.terraformersmc.com/" }
+    maven { url = "https://maven.shedaniel.me/" }
 }
-
 dependencies {
-    // 1. The Minecraft Target
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
-    
-    // 2. Official Mojang Mappings (Bypassing Yarn entirely)
-    // No mappings needed for 26.1+ as Mojang provides unobfuscated code
-
-    // 3. Fabric Loader & API
     implementation "net.fabricmc:fabric-loader:${project.loader_version}"
     implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
-
-    // 4. Cloth Config & Mod Menu
     api("me.shedaniel.cloth:cloth-config-fabric:${project.cloth_config_version}") {
         exclude(group: "net.fabricmc.fabric-api")
     }
