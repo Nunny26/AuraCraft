@@ -28,25 +28,34 @@ public class ServerPlayNetworkHandlerMixin {
      */
     @Inject(method = "handlePlaceRecipe", at = @At("HEAD"))
     private void radiusCrafting$onCraftRequest(ServerboundPlaceRecipePacket packet, CallbackInfo ci) {
-        net.minecraft.world.item.crafting.display.RecipeDisplayId recipeId = packet.recipe();
-        boolean craftAll = packet.useMaxItems();
+        // 1. THREAD SAFETY LOCK
+        if (!((net.minecraft.server.level.ServerLevel)this.player.level()).getServer().isSameThread()) {
+            return; // Abort on Netty thread. Vanilla will re-call this on the main Server Thread!
+        }
+        
+        if (packet.containerId() == this.player.containerMenu.containerId) {
+            net.minecraft.world.item.crafting.display.RecipeDisplayId recipeId = packet.recipe();
+            boolean craftAll = packet.useMaxItems();
 
-        net.minecraft.world.item.crafting.RecipeManager.ServerDisplayInfo displayInfo = ((net.minecraft.server.level.ServerLevel)this.player.level()).getServer().getRecipeManager().getRecipeFromDisplay(recipeId);
+            net.minecraft.world.item.crafting.RecipeManager.ServerDisplayInfo displayInfo = ((net.minecraft.server.level.ServerLevel)this.player.level()).getServer().getRecipeManager().getRecipeFromDisplay(recipeId);
 
-        if (displayInfo != null) {
-            RecipeHolder<?> recipeEntry = displayInfo.parent();
-            RadiusCraftingLogic.LOGGER.info("Intercepted Recipe Book craft request");
-            
-            RadiusCraftingLogic.pullItemsToInventory(
-                this.player, 
-                recipeEntry.value().placementInfo().ingredients(), 
-                craftAll, 
-                RadiusCrafting.CONFIG.searchRadius,
-                RadiusCrafting.CONFIG.useEnderChest,
-                RadiusCrafting.CONFIG.useShulkerBoxes
-            );
-        } else {
-            RadiusCraftingLogic.LOGGER.warn("Could not find recipe with display ID");
+            if (displayInfo != null) {
+                RecipeHolder<?> recipeEntry = displayInfo.parent();
+                if (recipeEntry != null) {
+                    RadiusCraftingLogic.LOGGER.info("Intercepted Recipe Book craft request");
+                    
+                    RadiusCraftingLogic.pullItemsToInventory(
+                        this.player, 
+                        recipeEntry.value().placementInfo(), 
+                        craftAll, 
+                        RadiusCrafting.CONFIG.searchRadius,
+                        RadiusCrafting.CONFIG.useEnderChest,
+                        RadiusCrafting.CONFIG.useShulkerBoxes
+                    );
+                }
+            } else {
+                RadiusCraftingLogic.LOGGER.warn("Could not find recipe with display ID");
+            }
         }
     }
 }

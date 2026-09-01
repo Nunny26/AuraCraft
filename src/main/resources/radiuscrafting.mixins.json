@@ -1,14 +1,13 @@
 {
   "required": true,
-  "minVersion": "0.8",
   "package": "com.radiuscrafting.mixin",
-  "compatibilityLevel": "JAVA_25",
+  "compatibilityLevel": "JAVA_21",
   "mixins": [
-    "ServerPlayNetworkHandlerMixin",
     "PlayerInventoryMixin",
-    "HandledScreenMixin",
-    "RecipeBookComponentMixin"
+    "ServerPlayNetworkHandlerMixin",
+    "ServerPlayerMixin"
   ],
+  "client": [],
   "injectors": {
     "defaultRequire": 1
   }

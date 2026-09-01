@@ -24,8 +24,9 @@ import net.minecraft.world.item.Item;
 public class RadiusCraftingLogic {
     public static final Logger LOGGER = LogUtils.getLogger();
 
-    public interface ItemSource {
-        ItemStack extractItem(Ingredient ingredient, int amount, boolean simulate);
+    public interface IItemSource {
+        ItemStack extractItem(Ingredient ingredient, int amount, boolean simulate, Item lockedItem);
+        ItemStack extractOne(Ingredient ingredient, Item lockedItem);
         int countItem(Ingredient ingredient);
         net.minecraft.network.chat.Component getDisplayName();
         String getStorageId();
@@ -33,9 +34,10 @@ public class RadiusCraftingLogic {
         ItemStack getStackInSlot(int slot);
         void setStackInSlot(int slot, ItemStack stack);
         boolean isShulkerSource();
+        void insertItem(ItemStack stack);
     }
 
-    public static class InventorySource implements ItemSource {
+    public static class InventorySource implements IItemSource {
         private final Container inventory;
         private final net.minecraft.network.chat.Component displayName;
         private final String storageId;
@@ -47,11 +49,12 @@ public class RadiusCraftingLogic {
         }
 
         @Override
-        public ItemStack extractItem(Ingredient ingredient, int amount, boolean simulate) {
+        public ItemStack extractItem(Ingredient ingredient, int amount, boolean simulate, Item lockedItem) {
             ItemStack extracted = ItemStack.EMPTY;
             for (int i = 0; i < inventory.getContainerSize(); i++) {
                 ItemStack stack = inventory.getItem(i);
-                if (!stack.isEmpty() && ingredient.test(stack)) {
+                boolean isValid = lockedItem != null ? stack.is(lockedItem) : ingredient.test(stack);
+                if (!stack.isEmpty() && isValid) {
                     int toTake = Math.min(stack.getCount(), amount - extracted.getCount());
                     if (toTake > 0) {
                         if (extracted.isEmpty()) {
@@ -64,7 +67,6 @@ public class RadiusCraftingLogic {
                         
                         if (!simulate) {
                             inventory.removeItem(i, toTake);
-                            LOGGER.info("Extracted {} {} from {}", toTake, stack.getHoverName().getString(), displayName.getString());
                         }
                         
                         if (extracted.getCount() >= amount) break;
@@ -72,6 +74,11 @@ public class RadiusCraftingLogic {
                 }
             }
             return extracted;
+        }
+
+        @Override
+        public ItemStack extractOne(Ingredient ingredient, Item lockedItem) {
+            return extractItem(ingredient, 1, false, lockedItem);
         }
 
         @Override
@@ -122,9 +129,29 @@ public class RadiusCraftingLogic {
         public boolean isShulkerSource() {
             return false;
         }
+
+        @Override
+        public void insertItem(ItemStack stack) {
+            for (int i = 0; i < inventory.getContainerSize(); i++) {
+                ItemStack slot = inventory.getItem(i);
+                if (slot.isEmpty()) {
+                    inventory.setItem(i, stack.copy());
+                    stack.setCount(0);
+                    break;
+                } else if (ItemStack.isSameItemSameComponents(slot, stack)) {
+                    int space = slot.getMaxStackSize() - slot.getCount();
+                    int toAdd = Math.min(space, stack.getCount());
+                    if (toAdd > 0) {
+                        slot.grow(toAdd);
+                        stack.shrink(toAdd);
+                        if (stack.isEmpty()) break;
+                    }
+                }
+            }
+        }
     }
 
-    public static class ShulkerBoxItemSource implements ItemSource {
+    public static class ShulkerBoxItemSource implements IItemSource {
         public final ItemStack shulkerStack;
         private final net.minecraft.network.chat.Component displayName;
         private final String storageId;
@@ -136,7 +163,7 @@ public class RadiusCraftingLogic {
         }
 
         @Override
-        public ItemStack extractItem(Ingredient ingredient, int amount, boolean simulate) {
+        public ItemStack extractItem(Ingredient ingredient, int amount, boolean simulate, Item lockedItem) {
             ItemContainerContents container = shulkerStack.get(DataComponents.CONTAINER);
             if (container == null) return ItemStack.EMPTY;
 
@@ -148,7 +175,8 @@ public class RadiusCraftingLogic {
 
             for (int i = 0; i < stacks.size(); i++) {
                 ItemStack stack = stacks.get(i);
-                if (!stack.isEmpty() && ingredient.test(stack)) {
+                boolean isValid = lockedItem != null ? stack.is(lockedItem) : ingredient.test(stack);
+                if (!stack.isEmpty() && isValid) {
                     int toTake = Math.min(stack.getCount(), amount - extracted.getCount());
                     if (toTake > 0) {
                         if (extracted.isEmpty()) {
@@ -163,7 +191,6 @@ public class RadiusCraftingLogic {
                             stack.shrink(toTake);
                             stacks.set(i, stack.isEmpty() ? ItemStack.EMPTY : stack);
                             changed = true;
-                            LOGGER.info("Extracted {} {} from Shulker Box ({})", toTake, stack.getHoverName().getString(), displayName.getString());
                         }
 
                         if (extracted.getCount() >= amount) break;
@@ -172,11 +199,36 @@ public class RadiusCraftingLogic {
             }
 
             if (changed && !simulate) {
-                LOGGER.info("Mutating DataComponents.CONTAINER on Shulker Box to save changes.");
                 shulkerStack.set(DataComponents.CONTAINER, ItemContainerContents.fromItems(stacks));
             }
 
             return extracted;
+        }
+
+        @Override
+        public ItemStack extractOne(Ingredient ingredient, Item lockedItem) {
+            net.minecraft.world.item.component.ItemContainerContents contents = shulkerStack.getOrDefault(net.minecraft.core.component.DataComponents.CONTAINER, net.minecraft.world.item.component.ItemContainerContents.EMPTY);
+            java.util.List<net.minecraft.world.item.ItemStack> list = new java.util.ArrayList<>();
+            contents.nonEmptyItemCopyStream().forEach(list::add); // Mutable copy of items
+
+            net.minecraft.world.item.ItemStack extracted = net.minecraft.world.item.ItemStack.EMPTY;
+
+            for (int i = 0; i < list.size(); i++) {
+                net.minecraft.world.item.ItemStack stack = list.get(i);
+                boolean isValid = lockedItem != null ? stack.is(lockedItem) : ingredient.test(stack);
+                if (!stack.isEmpty() && isValid) {
+                    extracted = stack.split(1); // split(1) modifies the original stack and returns exactly 1 item!
+                    if (stack.isEmpty()) {
+                        list.set(i, net.minecraft.world.item.ItemStack.EMPTY);
+                    }
+                    break;
+                }
+            }
+
+            if (!extracted.isEmpty()) {
+                shulkerStack.set(net.minecraft.core.component.DataComponents.CONTAINER, net.minecraft.world.item.component.ItemContainerContents.fromItems(list));
+            }
+            return extracted; // Return the pulled item, NOT the remainder!
         }
 
         @Override
@@ -236,15 +288,35 @@ public class RadiusCraftingLogic {
         public boolean isShulkerSource() {
             return true;
         }
+
+        @Override
+        public void insertItem(ItemStack stack) {
+            ItemContainerContents contents = shulkerStack.getOrDefault(DataComponents.CONTAINER, ItemContainerContents.EMPTY);
+            List<ItemStack> list = new ArrayList<>();
+            contents.nonEmptyItemCopyStream().forEach(list::add);
+            for (int i = 0; i < 27; i++) {
+                if (i >= list.size()) list.add(ItemStack.EMPTY);
+                ItemStack slot = list.get(i);
+                if (slot.isEmpty()) {
+                    list.set(i, stack.copy());
+                    stack.setCount(0);
+                    break;
+                } else if (ItemStack.isSameItemSameComponents(slot, stack)) {
+                    int space = slot.getMaxStackSize() - slot.getCount();
+                    int toAdd = Math.min(space, stack.getCount());
+                    if (toAdd > 0) {
+                        slot.grow(toAdd);
+                        stack.shrink(toAdd);
+                        if (stack.isEmpty()) break;
+                    }
+                }
+            }
+            shulkerStack.set(DataComponents.CONTAINER, ItemContainerContents.fromItems(list));
+        }
     }
 
-    public static List<ItemSource> getSources(Player player, int radius, boolean useEnderChest, boolean useShulkerBoxes) {
-        List<ItemSource> inventorySources = new ArrayList<>();
-        List<ItemSource> storageSources = new ArrayList<>();
-        
-        LOGGER.info("Gathering item sources for player {}...", player.getName().getString());
-        
-        inventorySources.add(new InventorySource(player.getInventory(), net.minecraft.network.chat.Component.literal("Player Inventory"), "Player Inventory"));
+    public static List<IItemSource> getSources(Player player, int radius, boolean useEnderChest, boolean useShulkerBoxes) {
+        List<IItemSource> storageSources = new ArrayList<>();
         
         if (useShulkerBoxes) {
             for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
@@ -304,117 +376,150 @@ public class RadiusCraftingLogic {
             }
         }
         
-        List<ItemSource> finalSources = new ArrayList<>();
-        if (com.radiuscrafting.RadiusCrafting.CONFIG.pullPriority == com.radiuscrafting.config.ModConfig.PullPriority.STORAGE_FIRST) {
-            finalSources.addAll(storageSources);
-            finalSources.addAll(inventorySources);
-        } else {
-            finalSources.addAll(inventorySources);
-            finalSources.addAll(storageSources);
-        }
-        
-        return finalSources;
-    }
-
-    public static List<com.radiuscrafting.network.ModMessages.StorageUIRecord> getStorageRecords(Player player, int radius, boolean useEnderChest, boolean useShulkerBoxes) {
-        List<com.radiuscrafting.network.ModMessages.StorageUIRecord> records = new ArrayList<>();
-        List<ItemSource> sources = getSources(player, radius, useEnderChest, useShulkerBoxes);
-        for (ItemSource source : sources) {
-            if (source.getStorageId().equals("Player Inventory")) continue;
-            records.add(new com.radiuscrafting.network.ModMessages.StorageUIRecord(source.getStorageId(), source.getDisplayName(), source.getAllItems()));
-        }
-        return records;
+        return storageSources;
     }
 
     private static boolean isShulkerBox(ItemStack stack) {
         return stack.has(DataComponents.CONTAINER);
     }
 
-    public static void pullItemsToInventory(ServerPlayer player, List<Ingredient> recipeIngredients, boolean craftAll, int radius, boolean useEnderChest, boolean useShulkerBoxes) {
-        LOGGER.info("--- STARTING AUTO-PULL FOR RECIPE ---");
-        List<ItemSource> sources = getSources(player, radius, useEnderChest, useShulkerBoxes);
+    public static void pullItemsToInventory(ServerPlayer player, net.minecraft.world.item.crafting.PlacementInfo placementInfo, boolean craftAll, int radius, boolean useEnderChest, boolean useShulkerBoxes) {
+        List<IItemSource> sources = getSources(player, radius, useEnderChest, useShulkerBoxes);
         
-        int craftMultiplier = craftAll ? 64 : 1; 
+        List<Ingredient> baseIngredients = placementInfo.ingredients();
+        it.unimi.dsi.fastutil.ints.IntList slotsToIngredientIndex = placementInfo.slotsToIngredientIndex();
         
-        Map<Item, Integer> allocatedTracker = new HashMap<>();
-        Map<Item, Integer> inventoryCounts = new HashMap<>();
-        
-        for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
-            ItemStack stack = player.getInventory().getItem(i);
-            if (!stack.isEmpty()) {
-                inventoryCounts.put(stack.getItem(), inventoryCounts.getOrDefault(stack.getItem(), 0) + stack.getCount());
+        // Build exactly 1 set of recipe ingredients
+        List<Ingredient> ingredients = new java.util.ArrayList<>();
+        for (int i = 0; i < slotsToIngredientIndex.size(); i++) {
+            int idx = slotsToIngredientIndex.getInt(i);
+            if (idx >= 0 && idx < baseIngredients.size()) {
+                ingredients.add(baseIngredients.get(idx));
             }
         }
         
-        int slotIndex = 0;
-        for (Ingredient ingredient : recipeIngredients) {
-            slotIndex++;
-            if (ingredient.isEmpty()) continue;
-            
-            int needed = craftMultiplier;
-            
-            for (Map.Entry<Item, Integer> entry : inventoryCounts.entrySet()) {
-                Item item = entry.getKey();
-                if (ingredient.test(item.getDefaultInstance())) {
-                    int totalInInv = entry.getValue();
-                    int allocated = allocatedTracker.getOrDefault(item, 0);
-                    int free = totalInInv - allocated;
-                    
-                    if (free > 0) {
-                        int amountToTake = Math.min(needed, free);
-                        allocatedTracker.put(item, allocated + amountToTake);
-                        needed -= amountToTake;
-                        if (needed <= 0) break;
-                    }
-                }
+        // PHASE 1: The Virtual Ledger (Initialized once, mutated each iteration)
+        java.util.Map<net.minecraft.world.item.Item, Integer> playerLedger = new java.util.HashMap<>();
+        for (int i = 0; i < player.getInventory().getContainerSize(); i++) {
+            net.minecraft.world.item.ItemStack stack = player.getInventory().getItem(i);
+            if (!stack.isEmpty() && !stack.is(net.minecraft.world.item.Items.AIR)) {
+                playerLedger.put(stack.getItem(), playerLedger.getOrDefault(stack.getItem(), 0) + stack.getCount());
             }
-            
-            if (needed <= 0) continue;
+        }
 
-            for (ItemSource source : sources) {
-                if (needed <= 0) break;
-                
-                int sourceHas = source.countItem(ingredient);
-                if (sourceHas > 0) {
-                    int toPull = Math.min(needed, sourceHas);
-                    ItemStack pulledStack = source.extractItem(ingredient, toPull, false);
-                    
-                    if (!pulledStack.isEmpty()) {
-                        int pulledCount = pulledStack.getCount();
-                        Item pulledItem = pulledStack.getItem();
-                        
-                        inventoryCounts.put(pulledItem, inventoryCounts.getOrDefault(pulledItem, 0) + pulledCount);
-                        allocatedTracker.put(pulledItem, allocatedTracker.getOrDefault(pulledItem, 0) + pulledCount);
-                        
-                        player.getInventory().add(pulledStack);
-                        
-                        if (!pulledStack.isEmpty()) {
-                            player.drop(pulledStack, false);
+        int craftIterations = 0;
+        java.util.Map<Integer, net.minecraft.world.item.Item> lockedItems = new java.util.HashMap<>();
+        
+        while (true) {
+            if (craftIterations >= 64) break;
+
+            java.util.List<Integer> missingIndices = new java.util.ArrayList<>();
+
+            for (int i = 0; i < ingredients.size(); i++) {
+                net.minecraft.world.item.crafting.Ingredient ingredient = ingredients.get(i);
+                // STRICT AIR/EMPTY CHECK
+                if (ingredient == null || ingredient.isEmpty() || ingredient.test(net.minecraft.world.item.ItemStack.EMPTY)) {
+                    continue;
+                }
+
+                boolean satisfied = false;
+                for (net.minecraft.world.item.Item item : playerLedger.keySet()) {
+                    if (playerLedger.get(item) > 0) {
+                        boolean isValid = false;
+                        if (lockedItems.containsKey(i)) {
+                            isValid = item == lockedItems.get(i);
+                        } else {
+                            isValid = ingredient.test(new net.minecraft.world.item.ItemStack(item));
                         }
                         
-                        needed -= pulledCount; 
+                        if (isValid) {
+                            playerLedger.put(item, playerLedger.get(item) - 1);
+                            lockedItems.put(i, item);
+                            satisfied = true;
+                            break;
+                        }
                     }
                 }
+
+                if (!satisfied) {
+                    missingIndices.add(i);
+                }
+            }
+            
+            if (missingIndices.isEmpty()) {
+                craftIterations++;
+                if (!craftAll) break;
+                continue;
+            }
+
+            // PHASE 2: Transactional Physical Extraction
+            boolean success = true;
+            class PendingExtraction {
+                final IItemSource source;
+                final ItemStack stack;
+                PendingExtraction(IItemSource s, ItemStack st) { this.source = s; this.stack = st; }
+            }
+            List<PendingExtraction> pendingPulls = new ArrayList<>();
+            
+            for (int idx : missingIndices) {
+                net.minecraft.world.item.crafting.Ingredient missing = ingredients.get(idx);
+                net.minecraft.world.item.Item lockedItem = lockedItems.get(idx);
+                
+                boolean found = false;
+                for (IItemSource source : sources) { 
+                    net.minecraft.world.item.ItemStack extracted = source.extractOne(missing, lockedItem); 
+                    if (extracted != null && !extracted.isEmpty() && !extracted.is(net.minecraft.world.item.Items.AIR)) {
+                        pendingPulls.add(new PendingExtraction(source, extracted));
+                        lockedItems.put(idx, extracted.getItem());
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    success = false;
+                    break;
+                }
+            }
+            
+            if (success) {
+                // Commit to player inventory
+                for (PendingExtraction pe : pendingPulls) {
+                    player.getInventory().add(pe.stack);
+                    // Add it to the ledger so the next iteration knows it is in the inventory
+                    playerLedger.put(pe.stack.getItem(), playerLedger.getOrDefault(pe.stack.getItem(), 0) + 1);
+                }
+                craftIterations++;
+                if (!craftAll) break;
+            } else {
+                // Abort and return to source to prevent partial flooding
+                for (PendingExtraction pe : pendingPulls) {
+                    pe.source.insertItem(pe.stack);
+                    if (!pe.stack.isEmpty()) {
+                        player.drop(pe.stack, false); // safety fallback
+                    }
+                }
+                break;
             }
         }
-        
+
+        // PHASE 3: Sync to Client
         player.containerMenu.broadcastChanges();
         player.inventoryMenu.broadcastChanges();
     }
 
     public static List<ItemStack> getAllAvailableItems(Player player, int radius, boolean useEnderChest, boolean useShulkerBoxes) {
         List<ItemStack> allItems = new ArrayList<>();
-        List<ItemSource> sources = getSources(player, radius, useEnderChest, useShulkerBoxes);
-        for(ItemSource source : sources) {
+        List<IItemSource> sources = getSources(player, radius, useEnderChest, useShulkerBoxes);
+        for(IItemSource source : sources) {
             allItems.addAll(source.getAllItems());
         }
         return allItems;
     }
 
     public static void handleVirtualClick(ServerPlayer player, String storageId, int slotIndex) {
-        List<ItemSource> sources = getSources(player, com.radiuscrafting.RadiusCrafting.CONFIG.searchRadius, com.radiuscrafting.RadiusCrafting.CONFIG.useEnderChest, com.radiuscrafting.RadiusCrafting.CONFIG.useShulkerBoxes);
-        ItemSource targetSource = null;
-        for (ItemSource source : sources) {
+        List<IItemSource> sources = getSources(player, com.radiuscrafting.RadiusCrafting.CONFIG.searchRadius, com.radiuscrafting.RadiusCrafting.CONFIG.useEnderChest, com.radiuscrafting.RadiusCrafting.CONFIG.useShulkerBoxes);
+        IItemSource targetSource = null;
+        for (IItemSource source : sources) {
             if (source.getStorageId().equals(storageId)) {
                 targetSource = source;
                 break;
@@ -495,6 +600,7 @@ public class RadiusCraftingLogic {
                 }
             } catch (Exception e) {}
         }
-        com.radiuscrafting.network.ModMessages.sendSyncPackets(player);
+        List<net.minecraft.world.item.ItemStack> allItems = getSources(player, com.radiuscrafting.RadiusCrafting.CONFIG.searchRadius, com.radiuscrafting.RadiusCrafting.CONFIG.useEnderChest, com.radiuscrafting.RadiusCrafting.CONFIG.useShulkerBoxes).stream().flatMap(source -> source.getAllItems().stream()).toList();
+        com.radiuscrafting.network.ModMessages.sendSyncNearbyItems(player, allItems);
     }
 }

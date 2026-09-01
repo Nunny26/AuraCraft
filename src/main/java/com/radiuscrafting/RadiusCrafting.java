@@ -15,6 +15,6 @@ public class RadiusCrafting implements ModInitializer {
         AutoConfig.register(ModConfig.class, GsonConfigSerializer::new);
         CONFIG = AutoConfig.getConfigHolder(ModConfig.class).getConfig();
 
-        ModMessages.registerC2SPackets();
+        ModMessages.registerPayloads();
     }
 }
